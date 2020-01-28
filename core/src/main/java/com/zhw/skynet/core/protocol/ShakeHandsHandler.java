@@ -238,6 +238,16 @@ public class ShakeHandsHandler extends ChannelDuplexHandler {
     }
 
     @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        releaseInitBuf();
+        if (req != null) {
+            req.notifyError(new ClosedChannelException());
+            req = null;
+        }
+        super.channelInactive(ctx);
+    }
+
+    @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         releaseInitBuf();
         if (req != null) {

@@ -58,9 +58,14 @@ public class Client {
             throw new IllegalArgumentException("requireServices max size " + ShakeHandsHandler.MAX_SERVICE_SIZE);
         }
 
-        Channel channel = bootstrap.connect().awaitUninterruptibly().channel();
+        ChannelFuture f = bootstrap.connect().awaitUninterruptibly();
+        if (!f.isSuccess()) {
+            throw f.cause();
+        }
+
+        Channel channel = f.channel();
         ShakeHandsReq handsReq = new ShakeHandsReq(services);
-        ChannelFuture future = channel.write(handsReq);
+        ChannelFuture future = channel.writeAndFlush(handsReq);
         future.awaitUninterruptibly();
         List<ShakeHandsReq.ServiceCount> list = handsReq.waitResponse(30000);
         if (list == null) {
