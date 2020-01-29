@@ -167,7 +167,8 @@ public class ShakeHandsHandler extends ChannelDuplexHandler {
             throw new ShakeHandsException("found service " + size + " expected " + serviceSize);
         }
         if (initBuf.readableBytes() != 0 || buf.readableBytes() != 0) {
-            throw new ShakeHandsException("read completed buf found data");
+            // 包都解析完了。应该没有数据没有读了
+            throw new ShakeHandsException("read completed buf found data left");
         }
 
         return true;
@@ -192,15 +193,17 @@ public class ShakeHandsHandler extends ChannelDuplexHandler {
     }
 
     private void readServiceName(ByteBuf buf) {
+        // 这个不会改变读指针
         String s = buf.toString(buf.readerIndex(), serviceLen, Codec.UTF8);
+        buf.readerIndex(buf.readerIndex() + serviceLen);
         response.add(new ShakeHandsReq.ServiceCount(s, serviceCount));
         serviceLen = -1;
         serviceCount = -1;
     }
 
     private void readServiceLen(ByteBuf buf) {
-        serviceLen = buf.readByte();
         serviceCount = buf.readByte();
+        serviceLen = buf.readByte();
         if (serviceLen > Request.MAX_SERVICE_LEN) {
             throw new ShakeHandsException("max service len: " + Request.MAX_SERVICE_LEN +
                     " found " + serviceLen);
