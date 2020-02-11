@@ -20,6 +20,12 @@ public class ProtocolDecoder extends ChannelDuplexHandler {
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-        super.write(ctx, msg, promise);
+        promise.addListener(f -> {
+            if (!f.isSuccess()) {
+                log.error("write msg ", f.cause());
+            }
+        });
+        ReqAction reqAction = (ReqAction) msg;
+        super.write(ctx, reqAction.fetchReqBuf(), promise);
     }
 }

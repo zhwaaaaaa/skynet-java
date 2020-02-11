@@ -92,7 +92,8 @@ public class Client {
     public Response send(Request req) throws RpcException {
         ByteBuf buf = codec.encode(req);
         ReqAction action = new ReqAction(buf);
-        channel.writeAndFlush(action);
+       channel.writeAndFlush(action);
+
         ByteBuf byteBuf;
         try {
             byteBuf = action.waitResponse(req.getTimeout());

@@ -33,8 +33,7 @@ public class RequestEncoder implements Encoder<Request> {
     private void encode0(Request req, ByteBuf buffer) {
         //[1:serviceLen][1-238:serviceName][4:requestId][4:clientId][4:serverId][1:bodyType][4:bodyLen]
         int servLen = req.getService().length();
-        int headLen = servLen  + 17;
-        buffer.writeByte(headLen);
+        buffer.writeByte(servLen);
         // service name
         buffer.writeByte(servLen);
         buffer.writeCharSequence(req.getService(), Codec.UTF8);
