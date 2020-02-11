@@ -28,10 +28,10 @@ public class ShakeHandsHandler extends ChannelDuplexHandler {
         return new ShakeHandsHandler(CONN_SERVER);
     }
 
-    private final int connTypeMask;
+    private final int connType;
 
     private ShakeHandsHandler(int connType) {
-        this.connTypeMask = connType << 24;
+        this.connType = connType;
     }
 
 
@@ -44,7 +44,6 @@ public class ShakeHandsHandler extends ChannelDuplexHandler {
     private int serviceSize = -1;
 
     private int serviceLen = -1; // serviceLen
-    private int serviceCount = -1;
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
@@ -54,10 +53,10 @@ public class ShakeHandsHandler extends ChannelDuplexHandler {
             ByteBuf buffer = ctx.channel().alloc().buffer(services.size() * 32);
             // msgSize placeholder
             buffer.writeZero(4);
-            int maskAndsize = connTypeMask | services.size();
-            buffer.writeIntLE(maskAndsize);
+            buffer.writeByte(connType);
+            buffer.writeShortLE(services.size());
 
-            int msgSize = 4;
+            int msgSize = 3;
             for (String service : services) {
                 int length = service.length();
                 buffer.writeByte(length);
@@ -105,13 +104,13 @@ public class ShakeHandsHandler extends ChannelDuplexHandler {
         if (responseLen <= 0) {
             int leftBytes = initBuf.readableBytes();
             // 还没有解析responseLen
-            if (i + leftBytes < 8) {
+            if (i + leftBytes < 6) {
                 // 还不够解析responseLen
                 initBuf.writeBytes(buf);
                 return;
             } else if (leftBytes > 0) {
                 // 之前读了几个字节
-                initBuf.writeBytes(buf, 8 - leftBytes);
+                initBuf.writeBytes(buf, 6 - leftBytes);
                 readResponseLen(initBuf);
                 // initBuf 必须清空
                 initBuf.writerIndex(0);
@@ -177,11 +176,11 @@ public class ShakeHandsHandler extends ChannelDuplexHandler {
     private boolean tryReadServiceName(ByteBuf buf) {
         int current = buf.readableBytes();
         int left = initBuf.readableBytes();
-        if (current + left < serviceLen) {
+        if (current + left < serviceLen + 1) {
             initBuf.writeBytes(buf);
             return false;
         } else if (left > 0) {
-            initBuf.writeBytes(buf, serviceLen - left);
+            initBuf.writeBytes(buf, serviceLen + 1 - left);
             readServiceName(initBuf);
             // initBuf 必须清空
             initBuf.writerIndex(0);
@@ -196,14 +195,13 @@ public class ShakeHandsHandler extends ChannelDuplexHandler {
         // 这个不会改变读指针
         String s = buf.toString(buf.readerIndex(), serviceLen, Codec.UTF8);
         buf.readerIndex(buf.readerIndex() + serviceLen);
-        response.add(new ShakeHandsReq.ServiceCount(s, serviceCount));
+
+        response.add(new ShakeHandsReq.ServiceCount(s, buf.readByte() & 0xFF));
         serviceLen = -1;
-        serviceCount = -1;
     }
 
     private void readServiceLen(ByteBuf buf) {
-        serviceCount = buf.readByte();
-        serviceLen = buf.readByte();
+        serviceLen = buf.readByte() & 0xFF;
         if (serviceLen > Request.MAX_SERVICE_LEN) {
             throw new ShakeHandsException("max service len: " + Request.MAX_SERVICE_LEN +
                     " found " + serviceLen);
@@ -215,7 +213,7 @@ public class ShakeHandsHandler extends ChannelDuplexHandler {
         // 读两个长度。
         // 第一次发了一个字节数 >= 8的包回来
         responseLen = buf.readIntLE();
-        serviceSize = buf.readIntLE();
+        serviceSize = buf.readShortLE();
         if (serviceSize != req.getServices().size()) {
             throw new ShakeHandsException("error serviceSize " + serviceSize +
                     "," + req.getServices().size() + " expected");

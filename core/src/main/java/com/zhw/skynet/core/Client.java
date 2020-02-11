@@ -64,8 +64,8 @@ public class Client {
 
         Channel channel = f.channel();
         ShakeHandsReq handsReq = new ShakeHandsReq(services);
-        ChannelFuture future = channel.writeAndFlush(handsReq);
-        future.awaitUninterruptibly();
+        channel.writeAndFlush(handsReq).awaitUninterruptibly();
+
         List<ShakeHandsReq.ServiceCount> list = handsReq.waitResponse(30000);
         if (list == null) {
             channel.close().awaitUninterruptibly();
@@ -92,7 +92,7 @@ public class Client {
     public Response send(Request req) throws RpcException {
         ByteBuf buf = codec.encode(req);
         ReqAction action = new ReqAction(buf);
-        channel.write(action);
+        channel.writeAndFlush(action);
         ByteBuf byteBuf;
         try {
             byteBuf = action.waitResponse(req.getTimeout());

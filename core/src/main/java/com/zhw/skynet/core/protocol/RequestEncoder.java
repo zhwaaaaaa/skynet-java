@@ -31,20 +31,16 @@ public class RequestEncoder implements Encoder<Request> {
     }
 
     private void encode0(Request req, ByteBuf buffer) {
+        //[1:serviceLen][1-238:serviceName][4:requestId][4:clientId][4:serverId][1:bodyType][4:bodyLen]
         int servLen = req.getService().length();
-        int methodLen = req.getMethod().length();
-        int headLen = servLen + methodLen + 18;
+        int headLen = servLen  + 17;
         buffer.writeByte(headLen);
-        // 4reqId|4clientId|4serverId|
-        buffer.writeZero(12);
         // service name
         buffer.writeByte(servLen);
         buffer.writeCharSequence(req.getService(), Codec.UTF8);
-        // method name
-        buffer.writeByte(methodLen);
-        buffer.writeCharSequence(req.getMethod(), Codec.UTF8);
-        // 4bodyLen
-        buffer.writeZero(4);
+        buffer.writeIntLE(req.getReqId());
+        // 4clientId|4serverId|1:bodyType
+        buffer.writeZero(13);
         Body body = req.getBody();
         if (body != null) {
             int bodyLenIndex = buffer.writerIndex() - 4;
