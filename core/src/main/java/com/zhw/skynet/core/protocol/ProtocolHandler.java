@@ -17,6 +17,7 @@ public class ProtocolHandler extends ByteToMessageDecoder {
         setCumulator(COMPOSITE_CUMULATOR);
     }
 
+
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
         if (response == null) {

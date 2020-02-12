@@ -82,4 +82,20 @@ public class Response {
     public void setBodyType(int bodyType) {
         this.bodyType = bodyType;
     }
+
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder("Response{");
+        sb.append("code=").append(code);
+        sb.append(", errorMsg='").append(errorMsg).append('\'');
+        sb.append(", reqId=").append(reqId);
+        sb.append(", clientId=").append(clientId);
+        sb.append(", serverId=").append(serverId);
+        sb.append(", bodyType=").append(bodyType);
+        sb.append(", bodyLen=").append(bodyLen);
+        sb.append(", service='").append(service).append('\'');
+        sb.append(", body=").append(body);
+        sb.append('}');
+        return sb.toString();
+    }
 }

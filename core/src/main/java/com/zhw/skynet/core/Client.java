@@ -30,11 +30,17 @@ public class Client {
             if (msg instanceof Response) {
                 Response response = (Response) msg;
                 ReqAction reqAction = map.remove(response.getReqId());
-                if (reqAction != null && reqAction.notifyResp(response)) {
+                if (reqAction == null) {
+                    super.channelRead(ctx, msg);
                     return;
                 }
+                if (!reqAction.notifyResp(response)) {
+                    super.channelRead(ctx, msg);
+                    return;
+                }
+            } else {
+                super.channelRead(ctx, msg);
             }
-            super.channelRead(ctx, msg);
         }
     }
 
@@ -50,6 +56,8 @@ public class Client {
         bootstrap = new Bootstrap();
         bootstrap.group(GROUP);
         bootstrap.remoteAddress(new InetSocketAddress(host, port));
+        bootstrap.option(ChannelOption.TCP_NODELAY, true);
+        bootstrap.option(ChannelOption.SO_KEEPALIVE, true);
         bootstrap.channel(NioSocketChannel.class);
         bootstrap.handler(new ChannelInitializer<NioSocketChannel>() {
             protected void initChannel(NioSocketChannel ch) throws Exception {
@@ -103,9 +111,9 @@ public class Client {
 
     public Response send(Request req) throws RpcException {
         ByteBuf buf = codec.encode(req);
-        channel.writeAndFlush(buf);
         ReqAction action = new ReqAction(req);
         map.put(req.getReqId(), action);
+        channel.writeAndFlush(buf);
         Response response;
         try {
             response = action.waitResponse(req.getTimeout());
