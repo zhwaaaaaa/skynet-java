@@ -1,22 +1,22 @@
 package com.zhw.skynet.core;
 
 public class Response {
-    private final int reqId;
     private int code;
     private String errorMsg;
+    private int reqId;
     private int clientId;
     private int serverId;
+    private int bodyType;
     private int bodyLen;
     private String service;
-    private String method;
-    private Body<?> body;
-
-    public Response(int reqId) {
-        this.reqId = reqId;
-    }
+    private Body body;
 
     public int getReqId() {
         return reqId;
+    }
+
+    public void setReqId(int reqId) {
+        this.reqId = reqId;
     }
 
     public int getClientId() {
@@ -51,19 +51,11 @@ public class Response {
         this.service = service;
     }
 
-    public String getMethod() {
-        return method;
-    }
-
-    public void setMethod(String method) {
-        this.method = method;
-    }
-
-    public Body<?> getBody() {
+    public Body getBody() {
         return body;
     }
 
-    public void setBody(Body<?> body) {
+    public void setBody(Body body) {
         this.body = body;
     }
 
@@ -81,5 +73,13 @@ public class Response {
 
     public void setErrorMsg(String errorMsg) {
         this.errorMsg = errorMsg;
+    }
+
+    public int getBodyType() {
+        return bodyType;
+    }
+
+    public void setBodyType(int bodyType) {
+        this.bodyType = bodyType;
     }
 }

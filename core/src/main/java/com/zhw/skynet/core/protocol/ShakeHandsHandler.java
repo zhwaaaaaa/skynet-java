@@ -129,7 +129,7 @@ public class ShakeHandsHandler extends ChannelDuplexHandler {
             req.notifyResp(response);
             req = null;
             response = null;
-            ctx.pipeline().replace(this, ProtocolDecoder.HANDLER_NAME, new ProtocolDecoder());
+            ctx.pipeline().replace(this, ProtocolHandler.HANDLER_NAME, new ProtocolHandler());
         }
     }
 

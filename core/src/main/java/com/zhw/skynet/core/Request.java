@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class Request {
     public static final int MAX_SERVICE_LEN = 238;
-    private static final AtomicInteger ID = new AtomicInteger();
+    private static final AtomicInteger ID = new AtomicInteger(88);
 
 
     private final int reqId = ID.getAndIncrement();

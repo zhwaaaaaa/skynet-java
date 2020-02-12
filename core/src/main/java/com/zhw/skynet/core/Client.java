@@ -4,10 +4,7 @@ import com.zhw.skynet.common.RpcException;
 import com.zhw.skynet.core.protocol.*;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.EventLoopGroup;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.internal.logging.InternalLogger;
@@ -27,10 +24,24 @@ public class Client {
     private static final EventLoopGroup GROUP = new NioEventLoopGroup(2);
     private static final InternalLogger log = InternalLoggerFactory.getInstance(Client.class);
 
+    private class ResponseReceiveHandler extends ChannelInboundHandlerAdapter {
+        @Override
+        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+            if (msg instanceof Response) {
+                Response response = (Response) msg;
+                ReqAction reqAction = map.remove(response.getReqId());
+                if (reqAction != null && reqAction.notifyResp(response)) {
+                    return;
+                }
+            }
+            super.channelRead(ctx, msg);
+        }
+    }
+
     private final Codec<Request, Response> codec =
             new CompositeCodec<>(new RequestEncoder(), null);
 
-    private ConcurrentHashMap<Integer, Request> map = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Integer, ReqAction> map = new ConcurrentHashMap<>();
 
     private Bootstrap bootstrap;
     private Channel channel;
@@ -42,7 +53,8 @@ public class Client {
         bootstrap.channel(NioSocketChannel.class);
         bootstrap.handler(new ChannelInitializer<NioSocketChannel>() {
             protected void initChannel(NioSocketChannel ch) throws Exception {
-                ch.pipeline().addLast(ShakeHandsHandler.forClient());
+                ch.pipeline().addLast(ShakeHandsHandler.forClient())
+                        .addLast("ResponseReceiveHandler", new ResponseReceiveHandler());
             }
         });
     }
@@ -91,22 +103,23 @@ public class Client {
 
     public Response send(Request req) throws RpcException {
         ByteBuf buf = codec.encode(req);
-        ReqAction action = new ReqAction(buf);
-       channel.writeAndFlush(action);
-
-        ByteBuf byteBuf;
+        channel.writeAndFlush(buf);
+        ReqAction action = new ReqAction(req);
+        map.put(req.getReqId(), action);
+        Response response;
         try {
-            byteBuf = action.waitResponse(req.getTimeout());
+            response = action.waitResponse(req.getTimeout());
         } catch (Throwable e) {
             if (e instanceof RpcException) {
                 throw (RpcException) e;
             }
             throw new RpcException(e);
         }
-        if (byteBuf == null && action.getBodyLen() != -1) {
-            throw new RpcException("timeout after[ms] " + 1000);
+        if (response == null) {
+            map.remove(req.getReqId());
+            throw new RpcException("timeout after[ms] " + req.getTimeout());
         }
-        return null;
+        return response;
     }
 
     public void sendAsync(Request req, Consumer<Response> resp) {
