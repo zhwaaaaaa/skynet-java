@@ -13,8 +13,7 @@ public class ReqAction extends Action<Response> {
         this.request = request;
     }
 
-    public ReqAction(BiConsumer<Response, Throwable> consumer,
-                     Request request) {
+    public ReqAction(Request request, BiConsumer<Response, Throwable> consumer) {
         super(consumer);
         this.request = request;
     }

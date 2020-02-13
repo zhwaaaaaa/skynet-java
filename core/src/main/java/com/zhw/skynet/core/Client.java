@@ -7,6 +7,8 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.util.HashedWheelTimer;
+import io.netty.util.Timeout;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 import org.apache.commons.collections4.CollectionUtils;
@@ -16,6 +18,9 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -48,6 +53,7 @@ public class Client {
             new CompositeCodec<>(new RequestEncoder(), null);
 
     private ConcurrentHashMap<Integer, ReqAction> map = new ConcurrentHashMap<>();
+    private HashedWheelTimer timer = new HashedWheelTimer();
 
     private Bootstrap bootstrap;
     private Channel channel;
@@ -130,8 +136,23 @@ public class Client {
         return response;
     }
 
-    public void sendAsync(Request req, Consumer<Response> resp) {
-
+    public void sendAsync(Request req, BiConsumer<Response, Throwable> consumer) {
+        ByteBuf buf = codec.encode(req);
+        Timeout timeout = timer.newTimeout(t -> {
+            if (!t.isCancelled()) {
+                ReqAction action = map.remove(req.getReqId());
+                if (action != null) {
+                    action.notifyError(new RpcException("timeout after[ms] "
+                            + req.getTimeout()));
+                }
+            }
+        }, req.getTimeout(), TimeUnit.MILLISECONDS);
+        ReqAction action = new ReqAction(req, (r, e) -> {
+            timeout.cancel();
+            consumer.accept(r, e);
+        });
+        map.put(req.getReqId(), action);
+        channel.writeAndFlush(buf);
     }
 
     public void close() {
