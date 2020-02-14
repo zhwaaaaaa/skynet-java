@@ -2,14 +2,32 @@ package com.zhw.skynet.core;
 
 public class Response {
     private int code;
-    private String errorMsg;
     private int reqId;
     private int clientId;
     private int serverId;
     private int bodyType;
-    private int bodyLen;
-    private String service;
-    private Body body;
+    private Object body;
+    private Throwable err;
+
+    public Response() {
+    }
+
+    public Response(int code, int reqId, int clientId, int serverId, int bodyType, Object body) {
+        this.code = code;
+        this.reqId = reqId;
+        this.clientId = clientId;
+        this.serverId = serverId;
+        this.bodyType = bodyType;
+        this.body = body;
+    }
+
+    public int getCode() {
+        return code;
+    }
+
+    public void setCode(int code) {
+        this.code = code;
+    }
 
     public int getReqId() {
         return reqId;
@@ -35,46 +53,6 @@ public class Response {
         this.serverId = serverId;
     }
 
-    public int getBodyLen() {
-        return bodyLen;
-    }
-
-    public void setBodyLen(int bodyLen) {
-        this.bodyLen = bodyLen;
-    }
-
-    public String getService() {
-        return service;
-    }
-
-    public void setService(String service) {
-        this.service = service;
-    }
-
-    public Body getBody() {
-        return body;
-    }
-
-    public void setBody(Body body) {
-        this.body = body;
-    }
-
-    public int getCode() {
-        return code;
-    }
-
-    public void setCode(int code) {
-        this.code = code;
-    }
-
-    public String getErrorMsg() {
-        return errorMsg;
-    }
-
-    public void setErrorMsg(String errorMsg) {
-        this.errorMsg = errorMsg;
-    }
-
     public int getBodyType() {
         return bodyType;
     }
@@ -83,19 +61,30 @@ public class Response {
         this.bodyType = bodyType;
     }
 
+    public Object getBody() {
+        return body;
+    }
+
+    public void setBody(Object body) {
+        this.body = body;
+    }
+
+    public Throwable getErr() {
+        return err;
+    }
+
+    public void setErr(Throwable err) {
+        this.err = err;
+    }
+
     @Override
     public String toString() {
-        final StringBuilder sb = new StringBuilder("Response{");
-        sb.append("code=").append(code);
-        sb.append(", errorMsg='").append(errorMsg).append('\'');
-        sb.append(", reqId=").append(reqId);
-        sb.append(", clientId=").append(clientId);
-        sb.append(", serverId=").append(serverId);
-        sb.append(", bodyType=").append(bodyType);
-        sb.append(", bodyLen=").append(bodyLen);
-        sb.append(", service='").append(service).append('\'');
-        sb.append(", body=").append(body);
-        sb.append('}');
-        return sb.toString();
+        return "Response{" + "code=" + code +
+                ", reqId=" + reqId +
+                ", clientId=" + clientId +
+                ", serverId=" + serverId +
+                ", bodyType=" + bodyType +
+                ", body=" + body +
+                '}';
     }
 }

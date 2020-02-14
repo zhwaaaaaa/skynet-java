@@ -1,9 +1,11 @@
 package com.zhw.skynet.core;
 
+import com.zhw.skynet.common.Constants;
 import com.zhw.skynet.common.RpcException;
 import com.zhw.skynet.core.protocol.*;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufInputStream;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -11,20 +13,17 @@ import io.netty.util.HashedWheelTimer;
 import io.netty.util.Timeout;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
-import org.apache.commons.collections4.CollectionUtils;
 
 import java.net.InetSocketAddress;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-public class Client {
+public class Client implements EndPoint {
 
     private static final EventLoopGroup GROUP = new NioEventLoopGroup(2);
     private static final InternalLogger log = InternalLoggerFactory.getInstance(Client.class);
@@ -32,33 +31,28 @@ public class Client {
     private class ResponseReceiveHandler extends ChannelInboundHandlerAdapter {
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            if (msg instanceof Response) {
-                Response response = (Response) msg;
-                ReqAction reqAction = map.remove(response.getReqId());
-                if (reqAction == null) {
-                    super.channelRead(ctx, msg);
+            if (msg instanceof ResponseMessage) {
+                ResponseMessage response = (ResponseMessage) msg;
+                ReqAction reqAction = map.remove(response.getResponseCode());
+                if (reqAction != null && reqAction.notifyResp(response)) {
                     return;
                 }
-                if (!reqAction.notifyResp(response)) {
-                    super.channelRead(ctx, msg);
-                    return;
-                }
-            } else {
-                super.channelRead(ctx, msg);
             }
+            super.channelRead(ctx, msg);
         }
     }
 
-    private final Codec<Request, Response> codec =
-            new CompositeCodec<>(new RequestEncoder(), null);
-
     private ConcurrentHashMap<Integer, ReqAction> map = new ConcurrentHashMap<>();
     private HashedWheelTimer timer = new HashedWheelTimer();
+    private Encoder<Request> encoder = new RequestEncoder();
 
     private Bootstrap bootstrap;
     private Channel channel;
 
-    public Client(String host, int port) {
+    private Executor executor;
+
+
+    public Client(String host, int port, Executor asyncExecutor) {
         bootstrap = new Bootstrap();
         bootstrap.group(GROUP);
         bootstrap.remoteAddress(new InetSocketAddress(host, port));
@@ -67,21 +61,15 @@ public class Client {
         bootstrap.channel(NioSocketChannel.class);
         bootstrap.handler(new ChannelInitializer<NioSocketChannel>() {
             protected void initChannel(NioSocketChannel ch) throws Exception {
-                ch.pipeline().addLast(ShakeHandsHandler.forClient())
+                ch.pipeline().addLast(new ClientShakeHandsHandler())
                         .addLast("ResponseReceiveHandler", new ResponseReceiveHandler());
             }
         });
+        executor = asyncExecutor;
     }
 
-    public void start(Collection<String> requireServices) throws Throwable {
-        if (CollectionUtils.isEmpty(requireServices)) {
-            throw new IllegalArgumentException("requireServices required");
-        }
-        HashSet<String> services = new HashSet<>(requireServices);
-
-        if (services.size() > ShakeHandsHandler.MAX_SERVICE_SIZE) {
-            throw new IllegalArgumentException("requireServices max size " + ShakeHandsHandler.MAX_SERVICE_SIZE);
-        }
+    public void start(Collection<ServiceMeta> serviceMetas) throws Throwable {
+        EndPoint.validServiceMetas(serviceMetas);
 
         ChannelFuture f = bootstrap.connect().awaitUninterruptibly();
         if (!f.isSuccess()) {
@@ -89,7 +77,7 @@ public class Client {
         }
 
         Channel channel = f.channel();
-        ShakeHandsReq handsReq = new ShakeHandsReq(services);
+        ShakeHandsReq handsReq = new ShakeHandsReq(serviceMetas);
         channel.writeAndFlush(handsReq).awaitUninterruptibly();
 
         List<ShakeHandsReq.ServiceCount> list = handsReq.waitResponse(30000);
@@ -116,45 +104,73 @@ public class Client {
     }
 
     public Response send(Request req) throws RpcException {
-        ByteBuf buf = codec.encode(req);
-        ReqAction action = new ReqAction(req);
-        map.put(req.getReqId(), action);
-        channel.writeAndFlush(buf);
-        Response response;
+        long timeoutMs = req.getMeta().getTimeoutMs();
+        ResponseMessage msg = null;
+        Throwable err = null;
         try {
-            response = action.waitResponse(req.getTimeout());
-        } catch (Throwable e) {
-            if (e instanceof RpcException) {
-                throw (RpcException) e;
+            ByteBuf buf = encoder.encode(req, req.getMeta());
+            ReqAction action = new ReqAction(req);
+            map.put(req.getReqId(), action);
+            channel.writeAndFlush(buf);
+            msg = action.waitResponse(timeoutMs);
+            if (msg == null) {
+                map.remove(req.getReqId());
+                err = new RpcException("timeout after[ms] " + timeoutMs);
             }
-            throw new RpcException(e);
+        } catch (RpcException e) {
+            err = e;
+        } catch (Throwable e) {
+            err = new RpcException(e);
         }
-        if (response == null) {
-            map.remove(req.getReqId());
-            throw new RpcException("timeout after[ms] " + req.getTimeout());
+        return convertToResponse(req, msg, err);
+    }
+
+    private Response convertToResponse(Request req, ResponseMessage msg, Throwable err) {
+        Response response = new Response();
+        response.setReqId(req.getReqId());
+        if (err != null) {
+            response.setCode(Constants.CODE_LOCAL_ERROR);
+            response.setErr(err);
+        } else {
+            response.setCode(msg.getResponseCode());
+            response.setClientId(msg.getClientId());
+            response.setServerId(msg.getServerId());
+            response.setBodyType(msg.getBodyType());
+
+            if (msg.getBodyLen() > 0) {
+                // TODO 判断不同的bodyType 用不同的序列化方式,这里先判断code是否正常
+                if (response.getCode() == 0) {
+                    response.setBody(req.getMeta().getResponseMapper().read(new ByteBufInputStream(msg.getBodyBuf())));
+                } else {
+                    response.setBody(msg.getBodyBuf().toString(Constants.UTF8));
+                }
+            }
+            msg.release();
         }
         return response;
     }
 
     public void sendAsync(Request req, BiConsumer<Response, Throwable> consumer) {
-        ByteBuf buf = codec.encode(req);
+        ByteBuf buf = encoder.encode(req, req.getMeta());
+        long timeoutMs = req.getMeta().getTimeoutMs();
         Timeout timeout = timer.newTimeout(t -> {
             if (!t.isCancelled()) {
                 ReqAction action = map.remove(req.getReqId());
                 if (action != null) {
                     action.notifyError(new RpcException("timeout after[ms] "
-                            + req.getTimeout()));
+                            + timeoutMs));
                 }
             }
-        }, req.getTimeout(), TimeUnit.MILLISECONDS);
+        }, timeoutMs, TimeUnit.MILLISECONDS);
         ReqAction action = new ReqAction(req, (r, e) -> {
             timeout.cancel();
-            consumer.accept(r, e);
+            executor.execute(() -> consumer.accept(convertToResponse(req, r, e), e));
         });
         map.put(req.getReqId(), action);
         channel.writeAndFlush(buf);
     }
 
+    @Override
     public void close() {
         Channel ch = this.channel;
         if (ch != null) {

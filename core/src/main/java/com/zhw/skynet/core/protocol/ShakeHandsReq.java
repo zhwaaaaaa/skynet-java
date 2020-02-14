@@ -1,5 +1,9 @@
 package com.zhw.skynet.core.protocol;
 
+import com.zhw.skynet.core.Action;
+import com.zhw.skynet.core.ServiceMeta;
+
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
@@ -27,13 +31,13 @@ public class ShakeHandsReq extends Action<List<ShakeHandsReq.ServiceCount>> {
         }
     }
 
-    private Set<String> services;
+    private Collection<ServiceMeta> services;
 
-    public ShakeHandsReq(Set<String> services) {
+    public ShakeHandsReq(Collection<ServiceMeta> services) {
         this.services = services;
     }
 
-    public Set<String> getServices() {
+    public Collection<ServiceMeta> getServices() {
         return services;
     }
 }

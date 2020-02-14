@@ -1,12 +1,14 @@
 package com.zhw.skynet.core.protocol;
 
-import com.zhw.skynet.core.Body;
+import com.zhw.skynet.common.Constants;
+import com.zhw.skynet.core.EncodeException;
 import com.zhw.skynet.core.Request;
+import com.zhw.skynet.core.ServiceMeta;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBufOutputStream;
 
 public class RequestEncoder implements Encoder<Request> {
-
     private final ByteBufAllocator allocator;
 
     public RequestEncoder() {
@@ -18,31 +20,34 @@ public class RequestEncoder implements Encoder<Request> {
     }
 
     @Override
-    public ByteBuf encode(Request req) {
+    public ByteBuf encode(Request req, ServiceMeta meta) throws EncodeException {
         //|1|4reqId|4clientId|4serverId|1|service|1|method|4bodyLen|body|
-        ByteBuf buffer = allocator.buffer(256);
+        ByteBuf buffer = allocator.buffer();
         try {
-            encode0(req, buffer);
+            encode0(buffer, req, req.getMeta());
         } catch (Throwable e) {
             buffer.release();
+            if (e instanceof EncodeException) {
+                throw e;
+            }
             throw new EncodeException(e);
         }
         return buffer;
     }
 
-    private void encode0(Request req, ByteBuf buffer) {
+    private void encode0(ByteBuf buffer, Request req, ServiceMeta meta) throws EncodeException {
         //[1:serviceLen][1-238:serviceName][4:requestId][4:clientId][4:serverId][1:bodyType][4:bodyLen]
-        int servLen = req.getService().length();
+        int servLen = meta.getServiceName().length();
         buffer.writeByte(servLen);
         // service name
-        buffer.writeCharSequence(req.getService(), Codec.UTF8);
+        buffer.writeCharSequence(meta.getServiceName(), Constants.UTF8);
         buffer.writeIntLE(req.getReqId());
         // 4clientId|4serverId|1:bodyType
         buffer.writeZero(13);
-        Body body = req.getBody();
+        Object body = req.getBody();
         if (body != null) {
             int bodyLenIndex = buffer.writerIndex() - 4;
-            int bodyLen = body.writeTo(buffer);
+            int bodyLen = meta.getRequestMapper().writeTo(body, new ByteBufOutputStream(buffer));
             int bodyEndIndex = buffer.writerIndex();
             buffer.writerIndex(bodyLenIndex);
             // 小端写bodyLen
@@ -51,5 +56,6 @@ public class RequestEncoder implements Encoder<Request> {
             buffer.writerIndex(bodyEndIndex);
         }
     }
+
 
 }

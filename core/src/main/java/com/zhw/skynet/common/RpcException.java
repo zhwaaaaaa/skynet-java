@@ -1,6 +1,7 @@
 package com.zhw.skynet.common;
 
 public class RpcException extends RuntimeException {
+
     public RpcException() {
     }
 

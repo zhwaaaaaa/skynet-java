@@ -1,4 +1,4 @@
-package com.zhw.skynet.core.protocol;
+package com.zhw.skynet.core;
 
 import com.zhw.skynet.common.RpcException;
 

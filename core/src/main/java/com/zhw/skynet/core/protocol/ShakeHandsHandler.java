@@ -1,8 +1,9 @@
 package com.zhw.skynet.core.protocol;
 
-import com.zhw.skynet.core.Request;
+import com.zhw.skynet.common.Constants;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelDuplexHandler;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.internal.logging.InternalLogger;
@@ -11,64 +12,26 @@ import io.netty.util.internal.logging.InternalLoggerFactory;
 import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
-public class ShakeHandsHandler extends ChannelDuplexHandler {
-    private static final int CONN_CLIENT = 0;
-    private static final int CONN_SERVER = 0xFF;
-    public static final int MAX_SERVICE_SIZE = 0XFFFFFF;
-
+public abstract class ShakeHandsHandler extends ChannelDuplexHandler {
     private static final InternalLogger log = InternalLoggerFactory.getInstance(ShakeHandsHandler.class);
-
-    public static ShakeHandsHandler forClient() {
-        return new ShakeHandsHandler(CONN_CLIENT);
-    }
-
-    public static ShakeHandsHandler forServer() {
-        return new ShakeHandsHandler(CONN_SERVER);
-    }
-
-    private final int connType;
-
-    private ShakeHandsHandler(int connType) {
-        this.connType = connType;
-    }
-
 
     private List<ShakeHandsReq.ServiceCount> response;
     private ShakeHandsReq req;
-
     private ByteBuf initBuf;
-
     private int responseLen = -1;
     private int serviceSize = -1;
-
     private int serviceLen = -1; // serviceLen
+
+    protected abstract int connType();
+
+    protected abstract ByteBuf encode(ChannelHandlerContext ctx, ShakeHandsReq req);
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
         if (msg instanceof ShakeHandsReq) {
-            req = (ShakeHandsReq) msg;
-            Set<String> services = req.getServices();
-            ByteBuf buffer = ctx.channel().alloc().buffer(services.size() * 32);
-            // msgSize placeholder
-            buffer.writeZero(4);
-            buffer.writeByte(connType);
-            buffer.writeShortLE(services.size());
-
-            int msgSize = 3;
-            for (String service : services) {
-                int length = service.length();
-                buffer.writeByte(length);
-                buffer.writeCharSequence(service, Codec.UTF8);
-                msgSize += length + 1;
-            }
-            int i = buffer.writerIndex();
-            buffer.writerIndex(0);
-            buffer.writeIntLE(msgSize);
-            buffer.writerIndex(i);
-
-            super.write(ctx, buffer, promise);
+            ByteBuf buf = encode(ctx, (ShakeHandsReq) msg);
+            super.write(ctx, buf, promise);
         } else {
             super.write(ctx, msg, promise);
         }
@@ -129,9 +92,11 @@ public class ShakeHandsHandler extends ChannelDuplexHandler {
             req.notifyResp(response);
             req = null;
             response = null;
-            ctx.pipeline().replace(this, ProtocolHandler.HANDLER_NAME, new ProtocolHandler());
+            ctx.pipeline().replace(this, "transferDecoder", getTransferHandler());
         }
     }
+
+    protected abstract ChannelHandler getTransferHandler();
 
     private boolean tryDecodeServices(ByteBuf buf) {
 
@@ -193,7 +158,7 @@ public class ShakeHandsHandler extends ChannelDuplexHandler {
 
     private void readServiceName(ByteBuf buf) {
         // 这个不会改变读指针
-        String s = buf.toString(buf.readerIndex(), serviceLen, Codec.UTF8);
+        String s = buf.toString(buf.readerIndex(), serviceLen, Constants.UTF8);
         buf.readerIndex(buf.readerIndex() + serviceLen);
 
         response.add(new ShakeHandsReq.ServiceCount(s, buf.readByte() & 0xFF));
@@ -202,8 +167,8 @@ public class ShakeHandsHandler extends ChannelDuplexHandler {
 
     private void readServiceLen(ByteBuf buf) {
         serviceLen = buf.readByte() & 0xFF;
-        if (serviceLen > Request.MAX_SERVICE_LEN) {
-            throw new ShakeHandsException("max service len: " + Request.MAX_SERVICE_LEN +
+        if (serviceLen > Constants.MAX_SERVICE_LEN) {
+            throw new ShakeHandsException("max service len: " + Constants.MAX_SERVICE_LEN +
                     " found " + serviceLen);
         }
 
@@ -222,7 +187,7 @@ public class ShakeHandsHandler extends ChannelDuplexHandler {
     }
 
     @Override
-    public void close(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
+    public final void close(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
         releaseInitBuf();
         if (req != null) {
             req.notifyError(new ClosedChannelException());
@@ -239,22 +204,27 @@ public class ShakeHandsHandler extends ChannelDuplexHandler {
     }
 
     @Override
-    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+    public final void channelInactive(ChannelHandlerContext ctx) throws Exception {
         releaseInitBuf();
         if (req != null) {
             req.notifyError(new ClosedChannelException());
             req = null;
         }
-        super.channelInactive(ctx);
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+    public final void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         releaseInitBuf();
         if (req != null) {
             req.notifyError(cause);
             req = null;
         }
-        super.exceptionCaught(ctx, cause);
     }
+
+    @Override
+    public void flush(ChannelHandlerContext ctx) throws Exception {
+        ctx.flush();
+    }
+
+
 }
