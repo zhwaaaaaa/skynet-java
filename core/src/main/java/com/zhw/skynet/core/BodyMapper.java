@@ -1,13 +1,12 @@
 package com.zhw.skynet.core;
 
-import java.io.InputStream;
-import java.io.OutputStream;
+import io.netty.buffer.ByteBuf;
 
 public interface BodyMapper<T> {
 
     String typeDesc();
 
-    int writeTo(Object data, OutputStream out) throws EncodeException;
+    int writeTo(T data, ByteBuf out, int writeOpts) throws EncodeException;
 
-    T read(InputStream in) throws DecodeException;
+    T read(ByteBuf in, int readOpts) throws DecodeException;
 }

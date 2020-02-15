@@ -4,10 +4,10 @@ import com.zhw.skynet.common.Constants;
 
 public class ServiceMeta {
     private String serviceName;
-    private int version = 1;
+    private int version;
     private long timeoutMs = 10000;
-    private BodyMapper<?> requestMapper;
-    private BodyMapper<?> responseMapper;
+    private BodyMapper requestMapper;
+    private BodyMapper responseMapper;
 
     public ServiceMeta() {
     }
@@ -16,7 +16,7 @@ public class ServiceMeta {
         setServiceName(serviceName);
     }
 
-    public ServiceMeta(String serviceName, BodyMapper<?> requestMapper, BodyMapper<?> responseMapper) {
+    public ServiceMeta(String serviceName, BodyMapper requestMapper, BodyMapper responseMapper) {
         this.serviceName = serviceName;
         this.requestMapper = requestMapper;
         this.responseMapper = responseMapper;
@@ -49,19 +49,19 @@ public class ServiceMeta {
         this.timeoutMs = timeoutMs;
     }
 
-    public BodyMapper<?> getRequestMapper() {
+    public BodyMapper getRequestMapper() {
         return requestMapper;
     }
 
-    public void setRequestMapper(BodyMapper<?> requestMapper) {
+    public void setRequestMapper(BodyMapper requestMapper) {
         this.requestMapper = requestMapper;
     }
 
-    public BodyMapper<?> getResponseMapper() {
+    public BodyMapper getResponseMapper() {
         return responseMapper;
     }
 
-    public void setResponseMapper(BodyMapper<?> responseMapper) {
+    public void setResponseMapper(BodyMapper responseMapper) {
         this.responseMapper = responseMapper;
     }
 }

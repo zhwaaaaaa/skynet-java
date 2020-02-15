@@ -32,7 +32,13 @@ public class ResponseHandler extends ByteToMessageDecoder {
             response.setServerId(in.readIntLE());
             response.setResponseCode(in.readByte() & 0xFF);
             response.setBodyType(in.readByte() & 0xFF);
-            response.setBodyLen(in.readIntLE());
+            int bodyLen = in.readIntLE();
+            response.setBodyLen(bodyLen);
+            if (bodyLen == 0) {
+                out.add(response);
+                response = null;
+                return;
+            }
         }
         if (in.readableBytes() >= response.getBodyLen()) {
             ByteBuf body = in.retainedSlice(in.readerIndex(), response.getBodyLen());

@@ -57,7 +57,7 @@ public class Server implements EndPoint {
             resp.setServerId(reqMsg.getServerId());
             ServiceMeta meta = null;
             if (invoker == null) {
-                reqMsg.release();
+                reqMsg.releaseBodyBuf();
                 resp.setCode(Constants.CODE_SERVER_NO_SERVICE);
                 resp.setBody("no such service " + reqMsg.getService());
             } else {
@@ -67,6 +67,7 @@ public class Server implements EndPoint {
                     Object result = invoker.invoke(request.getBody());
                     resp.setBody(result);
                 } catch (Throwable e) {
+                    // TODO
                     resp.setCode(errorToCode(e));
                     resp.setErr(e);
                 }
@@ -75,6 +76,7 @@ public class Server implements EndPoint {
             try {
                 buf = encoder.encode(resp, meta);
             } catch (Throwable e) {
+                log.error(e);
                 // 有可能是result编码失败
                 if (resp.getCode() == 0) {
                     resp.setCode(errorToCode(e));
@@ -99,6 +101,7 @@ public class Server implements EndPoint {
         } else if (err instanceof ValidateException) {
             return Constants.CODE_SERVER_PARAM_VALID_ERROR;
         } else {
+            log.error(err);
             return Constants.CODE_SERVER_RUNTIME_ERROR;
         }
     }
@@ -108,9 +111,9 @@ public class Server implements EndPoint {
         Object obj = null;
         if (msg.getServiceLen() > 0 && buf != null) {
             try {
-                obj = meta.getRequestMapper().read(new ByteBufInputStream(buf));
+                obj = meta.getRequestMapper().read(buf, 0);
             } finally {
-                msg.release();
+                msg.releaseBodyBuf();
             }
         }
         return new Request(msg.getRequestId(), meta, obj);

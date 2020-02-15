@@ -27,7 +27,6 @@ public class ServerShakeHandsHandler extends ShakeHandsHandler {
             byte[] param = meta.getRequestMapper().typeDesc().getBytes(Constants.UTF8);
             byte[] result = meta.getResponseMapper().typeDesc().getBytes(Constants.UTF8);
             int serviceMetaLen = 1 + serv.length + 4 + param.length + 4 + result.length;
-            buffer.writeIntLE(serviceMetaLen);
             buffer.writeByte(serv.length);
             buffer.writeBytes(serv);
             buffer.writeIntLE(param.length);
@@ -35,7 +34,7 @@ public class ServerShakeHandsHandler extends ShakeHandsHandler {
             buffer.writeIntLE(result.length);
             buffer.writeBytes(result);
             // 4serviceMetaLen + serviceMeta
-            pkgSize += 4 + serviceMetaLen;
+            pkgSize += serviceMetaLen;
         }
         int wi = buffer.writerIndex();
         buffer.writerIndex(0);
@@ -48,4 +47,5 @@ public class ServerShakeHandsHandler extends ShakeHandsHandler {
     protected ChannelHandler getTransferHandler() {
         return new RequestMessageHandler();
     }
+
 }

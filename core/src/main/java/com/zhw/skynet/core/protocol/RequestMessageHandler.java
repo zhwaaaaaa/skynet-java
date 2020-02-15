@@ -19,7 +19,6 @@ public class RequestMessageHandler extends ByteToMessageDecoder {
                 throw new DecoderException("get service len = " + serviceNameLen);
             }
             msg = new RequestMessage(serviceNameLen);
-
         }
         int bodyLen;
         if (msg.getService() == null) {
@@ -28,8 +27,7 @@ public class RequestMessageHandler extends ByteToMessageDecoder {
             if (in.readableBytes() < serviceLen + 17) {
                 return;
             }
-            msg.setService(in.toString(0, serviceLen, Constants.UTF8));
-            in.readerIndex(serviceLen);
+            msg.setService(in.readCharSequence(serviceLen, Constants.UTF8).toString());
             msg.setRequestId(in.readIntLE());
             msg.setClientId(in.readIntLE());
             msg.setServerId(in.readIntLE());
@@ -44,10 +42,12 @@ public class RequestMessageHandler extends ByteToMessageDecoder {
         } else {
             bodyLen = msg.getBodyLen();
         }
-        if (bodyLen < in.readableBytes()) {
+        if (bodyLen > in.readableBytes()) {
             return;
         }
-        ByteBuf buf = in.slice(in.readerIndex(), bodyLen);
+        ByteBuf buf = in.retainedSlice(in.readerIndex(), bodyLen);
+        // 跳过这个body。把它交给业务线程去解析
+        in.skipBytes(bodyLen);
         msg.setBodyBuf(buf);
         out.add(msg);
         msg = null;

@@ -31,9 +31,10 @@ public class ResponseEncoder implements Encoder<Response> {
             }
             throw new EncodeException(e);
         }
-        return null;
+        return buffer;
     }
 
+    @SuppressWarnings("unchecked")
     private void encode0(ByteBuf buffer, Response response, ServiceMeta meta) throws EncodeException {
         buffer.writeByte(Constants.RESPONSE_HEAD_LEN);
         /*
@@ -54,7 +55,7 @@ public class ResponseEncoder implements Encoder<Response> {
         Object body = response.getBody();
         if (body != null) {
             if (response.getCode() == 0) {
-                dataLen = meta.getResponseMapper().writeTo(body, new ByteBufOutputStream(buffer));
+                dataLen = meta.getResponseMapper().writeTo(body, buffer, 0);
             } else {
                 dataLen = buffer.writeCharSequence(body.toString(), Constants.UTF8);
             }

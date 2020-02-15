@@ -1,6 +1,7 @@
 package com.zhw.skynet.core.protocol;
 
 import com.zhw.skynet.common.Constants;
+import com.zhw.skynet.core.BodyMapper;
 import com.zhw.skynet.core.EncodeException;
 import com.zhw.skynet.core.Request;
 import com.zhw.skynet.core.ServiceMeta;
@@ -35,6 +36,7 @@ public class RequestEncoder implements Encoder<Request> {
         return buffer;
     }
 
+    @SuppressWarnings("unchecked")
     private void encode0(ByteBuf buffer, Request req, ServiceMeta meta) throws EncodeException {
         //[1:serviceLen][1-238:serviceName][4:requestId][4:clientId][4:serverId][1:bodyType][4:bodyLen]
         int servLen = meta.getServiceName().length();
@@ -47,7 +49,7 @@ public class RequestEncoder implements Encoder<Request> {
         Object body = req.getBody();
         if (body != null) {
             int bodyLenIndex = buffer.writerIndex() - 4;
-            int bodyLen = meta.getRequestMapper().writeTo(body, new ByteBufOutputStream(buffer));
+            int bodyLen = meta.getRequestMapper().writeTo(body, buffer, 0);
             int bodyEndIndex = buffer.writerIndex();
             buffer.writerIndex(bodyLenIndex);
             // 小端写bodyLen

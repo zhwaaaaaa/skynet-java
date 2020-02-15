@@ -3,6 +3,7 @@ package com.zhw.skynet.common;
 import java.nio.charset.Charset;
 
 public class Constants {
+    public static final String SERVICE_NAME_SEPARATOR = "/";
     public static final int MAX_SERVICE_LEN = 238;
     public static final int MAX_SERVICE_SIZE = 0xFFFF;
     public static final int RESPONSE_HEAD_LEN = 18;

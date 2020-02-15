@@ -3,7 +3,7 @@ package com.zhw.skynet.core.protocol;
 import io.netty.buffer.ByteBuf;
 import io.netty.util.ReferenceCounted;
 
-public class Message implements ReferenceCounted {
+public class Message {
     private int requestId;
     private int clientId;
     private int serverId;
@@ -59,60 +59,9 @@ public class Message implements ReferenceCounted {
         this.bodyType = bodyType;
     }
 
-
-    @Override
-    public int refCnt() {
+    public void releaseBodyBuf() {
         if (bodyBuf != null) {
-            return bodyBuf.refCnt();
+            bodyBuf.release();
         }
-        return 0;
-    }
-
-    @Override
-    public ReferenceCounted retain() {
-        if (bodyBuf != null) {
-            return bodyBuf.retain();
-        }
-        return null;
-    }
-
-    @Override
-    public ReferenceCounted retain(int increment) {
-        if (bodyBuf != null) {
-            return bodyBuf.retain(increment);
-        }
-        return null;
-    }
-
-    @Override
-    public ReferenceCounted touch() {
-        if (bodyBuf != null) {
-            return bodyBuf.touch();
-        }
-        return null;
-    }
-
-    @Override
-    public ReferenceCounted touch(Object hint) {
-        if (bodyBuf != null) {
-            return bodyBuf.touch(hint);
-        }
-        return null;
-    }
-
-    @Override
-    public boolean release() {
-        if (bodyBuf != null) {
-            return bodyBuf.release();
-        }
-        return true;
-    }
-
-    @Override
-    public boolean release(int decrement) {
-        if (bodyBuf != null) {
-            return bodyBuf.release();
-        }
-        return true;
     }
 }

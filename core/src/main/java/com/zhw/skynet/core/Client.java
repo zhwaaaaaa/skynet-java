@@ -33,7 +33,7 @@ public class Client implements EndPoint {
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
             if (msg instanceof ResponseMessage) {
                 ResponseMessage response = (ResponseMessage) msg;
-                ReqAction reqAction = map.remove(response.getResponseCode());
+                ReqAction reqAction = map.remove(response.getRequestId());
                 if (reqAction != null && reqAction.notifyResp(response)) {
                     return;
                 }
@@ -139,13 +139,15 @@ public class Client implements EndPoint {
 
             if (msg.getBodyLen() > 0) {
                 // TODO 判断不同的bodyType 用不同的序列化方式,这里先判断code是否正常
-                if (response.getCode() == 0) {
-                    response.setBody(req.getMeta().getResponseMapper().read(new ByteBufInputStream(msg.getBodyBuf())));
-                } else {
-                    response.setBody(msg.getBodyBuf().toString(Constants.UTF8));
+                if (msg.getBodyBuf() != null) {
+                    if (response.getCode() == 0) {
+                        response.setBody(req.getMeta().getResponseMapper().read(msg.getBodyBuf(), msg.getBodyType()));
+                    } else {
+                        response.setBody(msg.getBodyBuf().toString(Constants.UTF8));
+                    }
                 }
             }
-            msg.release();
+            msg.releaseBodyBuf();
         }
         return response;
     }
