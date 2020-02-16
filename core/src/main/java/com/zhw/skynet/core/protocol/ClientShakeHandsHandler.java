@@ -46,6 +46,6 @@ public class ClientShakeHandsHandler extends ShakeHandsHandler {
 
     @Override
     protected ChannelHandler getTransferHandler() {
-        return new ResponseHandler();
+        return new ResponseMessageHandler();
     }
 }

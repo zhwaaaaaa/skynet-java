@@ -42,7 +42,7 @@ public class RequestMessageHandler extends ByteToMessageDecoder {
         } else {
             bodyLen = msg.getBodyLen();
         }
-        if (bodyLen > in.readableBytes()) {
+        if (in.readableBytes() < bodyLen) {
             return;
         }
         ByteBuf buf = in.retainedSlice(in.readerIndex(), bodyLen);

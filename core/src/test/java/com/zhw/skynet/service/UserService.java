@@ -1,7 +1,9 @@
 package com.zhw.skynet.service;
 
+import java.util.List;
+
 public interface UserService {
 
-    String tellDesc(User user);
+    String tellDesc(List<User> users);
 
 }

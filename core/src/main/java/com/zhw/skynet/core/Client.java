@@ -5,7 +5,6 @@ import com.zhw.skynet.common.RpcException;
 import com.zhw.skynet.core.protocol.*;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufInputStream;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -28,7 +27,7 @@ public class Client implements EndPoint {
     private static final EventLoopGroup GROUP = new NioEventLoopGroup(2);
     private static final InternalLogger log = InternalLoggerFactory.getInstance(Client.class);
 
-    private class ResponseReceiveHandler extends ChannelInboundHandlerAdapter {
+    private class ResponseReceiveHandler extends ChannelDuplexHandler {
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
             if (msg instanceof ResponseMessage) {
@@ -39,6 +38,16 @@ public class Client implements EndPoint {
                 }
             }
             super.channelRead(ctx, msg);
+        }
+
+        @Override
+        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+            super.exceptionCaught(ctx, cause);
+        }
+
+        @Override
+        public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+            super.channelInactive(ctx);
         }
     }
 
@@ -166,7 +175,11 @@ public class Client implements EndPoint {
         }, timeoutMs, TimeUnit.MILLISECONDS);
         ReqAction action = new ReqAction(req, (r, e) -> {
             timeout.cancel();
-            executor.execute(() -> consumer.accept(convertToResponse(req, r, e), e));
+            try {
+                executor.execute(() -> consumer.accept(convertToResponse(req, r, e), e));
+            } catch (Throwable err) {
+                log.warn("error submit to thread pool", err);
+            }
         });
         map.put(req.getReqId(), action);
         channel.writeAndFlush(buf);

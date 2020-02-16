@@ -8,17 +8,19 @@ import io.netty.handler.codec.DecoderException;
 
 import java.util.List;
 
-public class ResponseHandler extends ByteToMessageDecoder {
+public class ResponseMessageHandler extends ByteToMessageDecoder {
     private ResponseMessage response;
+    public static final int RESPONSE_HEAD_PKG_LEN = Constants.RESPONSE_HEAD_LEN + 1;
 
-    public ResponseHandler() {
+    public ResponseMessageHandler() {
         setCumulator(COMPOSITE_CUMULATOR);
     }
 
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
+        int bodyLen;
         if (response == null) {
-            if (in.readableBytes() < 19) {
+            if (in.readableBytes() < RESPONSE_HEAD_PKG_LEN) {
                 return;
             }
             int headerLen = in.readByte() & 0xFF;
@@ -32,18 +34,20 @@ public class ResponseHandler extends ByteToMessageDecoder {
             response.setServerId(in.readIntLE());
             response.setResponseCode(in.readByte() & 0xFF);
             response.setBodyType(in.readByte() & 0xFF);
-            int bodyLen = in.readIntLE();
-            response.setBodyLen(bodyLen);
+            bodyLen = in.readIntLE();
             if (bodyLen == 0) {
                 out.add(response);
                 response = null;
                 return;
             }
+            response.setBodyLen(bodyLen);
+        } else {
+            bodyLen = response.getBodyLen();
         }
-        if (in.readableBytes() >= response.getBodyLen()) {
-            ByteBuf body = in.retainedSlice(in.readerIndex(), response.getBodyLen());
+        if (in.readableBytes() >= bodyLen) {
+            ByteBuf body = in.retainedSlice(in.readerIndex(), bodyLen);
             response.setBodyBuf(body);
-            in.skipBytes(response.getBodyLen());
+            in.skipBytes(bodyLen);
             out.add(response);
             response = null;
         }
