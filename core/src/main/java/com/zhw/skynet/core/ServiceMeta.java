@@ -1,5 +1,6 @@
 package com.zhw.skynet.core;
 
+
 import com.zhw.skynet.common.Constants;
 
 public class ServiceMeta {

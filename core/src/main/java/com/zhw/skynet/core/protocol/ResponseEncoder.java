@@ -6,7 +6,6 @@ import com.zhw.skynet.core.Response;
 import com.zhw.skynet.core.ServiceMeta;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufOutputStream;
 
 public class ResponseEncoder implements Encoder<Response> {
     private final ByteBufAllocator allocator;

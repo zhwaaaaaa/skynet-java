@@ -3,6 +3,15 @@ package com.zhw.skynet.common;
 import java.nio.charset.Charset;
 
 public class Constants {
+    public static final int MAX_MSG_LEN = 1073741824;// 1G
+
+    public static final int MSG_TYPE_CLIENT_SHAKE = 1;
+    public static final int MSG_TYPE_SERVER_SHAKE = 2;
+    public static final int MSG_TYPE_SHAKE_RESP = 3;
+    public static final int MSG_TYPE_HEARTBEAT = 4;
+    public static final int MSG_TYPE_TRANSFER_REQ = 5;
+    public static final int MSG_TYPE_TRANSFER_RESP = 6;
+
     public static final String SERVICE_NAME_SEPARATOR = "/";
     public static final int MAX_SERVICE_LEN = 238;
     public static final int MAX_SERVICE_SIZE = 0xFFFF;

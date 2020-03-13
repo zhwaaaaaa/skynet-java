@@ -1,13 +1,11 @@
 package com.zhw.skynet.core.protocol;
 
 import com.zhw.skynet.common.Constants;
-import com.zhw.skynet.core.BodyMapper;
 import com.zhw.skynet.core.EncodeException;
 import com.zhw.skynet.core.Request;
 import com.zhw.skynet.core.ServiceMeta;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufOutputStream;
 
 public class RequestEncoder implements Encoder<Request> {
     private final ByteBufAllocator allocator;
