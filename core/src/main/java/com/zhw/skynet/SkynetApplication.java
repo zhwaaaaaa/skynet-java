@@ -10,7 +10,7 @@ import java.util.concurrent.CountDownLatch;
 public class SkynetApplication {
     public static void main(String[] args) throws Throwable {
         Client client = new Client("ubuntu", 9999, Runnable::run);
-        ServiceMeta meta = new ServiceMeta("com.zhw.service.PrintService.print");
+        ServiceMeta meta = new ServiceMeta("com.zhw.service.PrintService","print");
         client.start(Collections.singletonList(meta));
 
         long bs = System.currentTimeMillis();

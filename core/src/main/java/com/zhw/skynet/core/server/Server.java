@@ -1,14 +1,18 @@
 package com.zhw.skynet.core.server;
 
 import com.zhw.skynet.common.Constants;
+import com.zhw.skynet.common.RpcException;
 import com.zhw.skynet.core.*;
-import com.zhw.skynet.core.protocol.*;
+import com.zhw.skynet.core.protocol.Codec;
+import com.zhw.skynet.core.protocol.CodecException;
+import com.zhw.skynet.core.protocol.RequestMessage;
 import com.zhw.skynet.core.sh.ShakeHandsException;
 import com.zhw.skynet.core.sh.ShakeHandsHandler;
 import com.zhw.skynet.core.sh.ShakeHandsReq;
 import com.zhw.skynet.core.sh.ShakeHandsResp;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.*;
 import io.netty.channel.epoll.EpollDomainSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -59,7 +63,8 @@ public class Server implements EndPoint {
 
             RequestMessage reqMsg = codec.decodeRequest(in);
 
-            ServiceInvoker invoker = invokerMap.get(reqMsg.getService());
+            ServiceMetaKey serviceMetaKey = ServiceMetaKey.of(reqMsg);
+            ServiceInvoker invoker = invokerMap.get(serviceMetaKey);
             Response resp = new Response();
             resp.setReqId(reqMsg.getRequestId());
             resp.setClientId(reqMsg.getClientId());
@@ -68,7 +73,7 @@ public class Server implements EndPoint {
             if (invoker == null) {
                 reqMsg.releaseBodyBuf();
                 resp.setCode(Constants.CODE_SERVER_NO_SERVICE);
-                resp.setBody("no such service " + reqMsg.getService());
+                resp.setBody(new RpcException("no such service " + serviceMetaKey, null, false, false));
             } else {
                 try {
                     meta = invoker.getServiceMeta();
@@ -116,22 +121,14 @@ public class Server implements EndPoint {
     }
 
     private Request convertToRequest(RequestMessage msg, ServiceMeta meta) throws CodecException {
-        ByteBuf buf = msg.getBodyBuf();
-        Object obj = null;
-        if (msg.getServiceLen() > 0 && buf != null) {
-            try {
-                obj = meta.getRequestMapper().read(buf, 0);
-            } finally {
-                msg.releaseBodyBuf();
-            }
-        }
-        return new Request(msg.getRequestId(), meta, obj);
+        Object body = codec.decodeBody(msg, meta);
+        return new Request(msg.getRequestId(), meta, body);
     }
 
-    private Codec<Response, RequestMessage> codec;
+    private Codec<Response, RequestMessage> codec = new ServerCodec(ByteBufAllocator.DEFAULT);
     private Bootstrap bootstrap;
     private Channel channel;
-    private Map<String, ServiceInvoker> invokerMap = new HashMap<>();
+    private Map<ServiceMetaKey, ServiceInvoker> invokerMap = new HashMap<>();
     private Executor executor;
 
 
@@ -170,7 +167,16 @@ public class Server implements EndPoint {
         bootstrap.channel(EpollDomainSocketChannel.class);
         bootstrap.handler(new ChannelInitializer<NioSocketChannel>() {
             protected void initChannel(NioSocketChannel ch) throws Exception {
-                ch.pipeline().addLast(ShakeHandsHandler.forProvider())
+                ch.pipeline()
+                        .addLast("msgSplitHandler", new LengthFieldBasedFrameDecoder(
+                                ByteOrder.LITTLE_ENDIAN,
+                                Constants.MAX_MSG_LEN,
+                                1,
+                                4,
+                                0,
+                                0,
+                                true
+                        )).addLast(ShakeHandsHandler.forProvider())
                         .addLast("ResponseReceiveHandler", new ReqMsgReceiveHandler());
             }
         });
@@ -182,10 +188,11 @@ public class Server implements EndPoint {
         if (channel != null) {
             throw new IllegalStateException("connected");
         }
-        String name = invoker.getServiceMeta().getServiceName();
-        ServiceInvoker old = invokerMap.put(name, invoker);
+        ServiceMeta meta = invoker.getServiceMeta();
+        ServiceMetaKey of = ServiceMetaKey.of(meta);
+        ServiceInvoker old = invokerMap.put(of, invoker);
         if (old != null) {
-            throw new IllegalStateException(String.format("%s added with %s", name, invoker));
+            throw new IllegalStateException(String.format("%s added with %s", of, invoker));
         }
     }
 

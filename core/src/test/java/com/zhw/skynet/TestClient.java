@@ -31,7 +31,7 @@ public class TestClient {
         }
         System.out.println(response);
         System.out.println("1次同步调用服务，耗时" + (System.currentTimeMillis() - start));*/
-        times = 3000;
+        times = 3;
         CountDownLatch latch = new CountDownLatch(times);
         start = System.currentTimeMillis();
         for (int i = 0; i < times; i++) {

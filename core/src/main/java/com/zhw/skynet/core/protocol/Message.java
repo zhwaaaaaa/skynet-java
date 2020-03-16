@@ -7,7 +7,7 @@ public class Message {
     private int clientId;
     private int serverId;
     private int bodyType;
-    private int bodyLen;
+    private int msgLen;
     private ByteBuf bodyBuf;
 
     public ByteBuf getBodyBuf() {
@@ -42,12 +42,12 @@ public class Message {
         this.serverId = serverId;
     }
 
-    public int getBodyLen() {
-        return bodyLen;
+    public int getMsgLen() {
+        return msgLen;
     }
 
-    public void setBodyLen(int bodyLen) {
-        this.bodyLen = bodyLen;
+    public void setMsgLen(int msgLen) {
+        this.msgLen = msgLen;
     }
 
     public int getBodyType() {

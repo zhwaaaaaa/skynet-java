@@ -3,22 +3,25 @@ package com.zhw.skynet.core.client;
 import com.zhw.skynet.common.Constants;
 import com.zhw.skynet.common.RpcException;
 import com.zhw.skynet.core.*;
-import com.zhw.skynet.core.protocol.*;
+import com.zhw.skynet.core.protocol.ResponseMessage;
 import com.zhw.skynet.core.sh.ShakeHandsException;
 import com.zhw.skynet.core.sh.ShakeHandsHandler;
 import com.zhw.skynet.core.sh.ShakeHandsReq;
 import com.zhw.skynet.core.sh.ShakeHandsResp;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.util.HashedWheelTimer;
 import io.netty.util.Timeout;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
 import java.net.InetSocketAddress;
+import java.nio.ByteOrder;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,7 +39,8 @@ public class Client implements EndPoint {
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
             if (msg instanceof ByteBuf) {
-                ResponseMessage response = (ResponseMessage) msg;
+                ByteBuf in = (ByteBuf) msg;
+                ResponseMessage response = codec.decodeRequest(in);
                 ReqAction reqAction = map.remove(response.getRequestId());
                 if (reqAction != null && reqAction.notifyResp(response)) {
                     return;
@@ -44,21 +48,11 @@ public class Client implements EndPoint {
             }
             super.channelRead(ctx, msg);
         }
-
-        @Override
-        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-            super.exceptionCaught(ctx, cause);
-        }
-
-        @Override
-        public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-            super.channelInactive(ctx);
-        }
     }
 
     private ConcurrentHashMap<Integer, ReqAction> map = new ConcurrentHashMap<>();
     private HashedWheelTimer timer = new HashedWheelTimer();
-    private ClientCodec codec = new ClientCodec();
+    private ClientCodec codec = new ClientCodec(ByteBufAllocator.DEFAULT);
 
     private Bootstrap bootstrap;
     private Channel channel;
@@ -75,7 +69,16 @@ public class Client implements EndPoint {
         bootstrap.channel(NioSocketChannel.class);
         bootstrap.handler(new ChannelInitializer<NioSocketChannel>() {
             protected void initChannel(NioSocketChannel ch) throws Exception {
-                ch.pipeline().addLast(ShakeHandsHandler.forConsumer())
+                ch.pipeline()
+                        .addLast("msgSplitHandler", new LengthFieldBasedFrameDecoder(
+                                ByteOrder.LITTLE_ENDIAN,
+                                Constants.MAX_MSG_LEN,
+                                1,
+                                4,
+                                0,
+                                0,
+                                true
+                        )).addLast(ShakeHandsHandler.forConsumer())
                         .addLast("ResponseReceiveHandler", new ResponseReceiveHandler());
             }
         });
@@ -151,7 +154,7 @@ public class Client implements EndPoint {
             response.setServerId(msg.getServerId());
             response.setBodyType(msg.getBodyType());
 
-            if (msg.getBodyLen() > 0) {
+            if (msg.getMsgLen() > 0) {
                 // TODO 判断不同的bodyType 用不同的序列化方式,这里先判断code是否正常
                 if (msg.getBodyBuf() != null) {
                     if (response.getCode() == 0) {

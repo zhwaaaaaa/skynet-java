@@ -1,7 +1,6 @@
 package com.zhw.skynet.core.body;
 
 import com.zhw.skynet.core.BodyMapper;
-import com.zhw.skynet.core.DecodeException;
 import com.zhw.skynet.core.protocol.CodecException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
@@ -50,13 +49,13 @@ public class AvroBodyMapper<T> implements BodyMapper<T> {
     }
 
     @Override
-    public T read(ByteBuf in, int readOpts) throws DecodeException {
+    public T read(ByteBuf in, int readOpts) throws CodecException {
         try {
             BinaryDecoder decoder = DecoderFactory.get()
                     .directBinaryDecoder(new ByteBufInputStream(in), null);
             return reader.read(null, decoder);
         } catch (IOException e) {
-            throw new DecodeException(e);
+            throw new CodecException(e);
         }
     }
 }

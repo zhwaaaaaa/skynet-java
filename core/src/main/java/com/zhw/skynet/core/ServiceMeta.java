@@ -13,12 +13,14 @@ public class ServiceMeta {
     public ServiceMeta() {
     }
 
-    public ServiceMeta(String serviceName) {
+    public ServiceMeta(String serviceName, String method) {
         setServiceName(serviceName);
+        setMethod(method);
     }
 
-    public ServiceMeta(String serviceName, BodyMapper requestMapper, BodyMapper responseMapper) {
+    public ServiceMeta(String serviceName, String method, BodyMapper requestMapper, BodyMapper responseMapper) {
         this.serviceName = serviceName;
+        this.method = method;
         this.requestMapper = requestMapper;
         this.responseMapper = responseMapper;
     }

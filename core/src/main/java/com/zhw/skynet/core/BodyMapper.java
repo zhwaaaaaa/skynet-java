@@ -9,5 +9,5 @@ public interface BodyMapper<T> {
 
     int writeTo(T data, ByteBuf out, int writeOpts) throws CodecException;
 
-    T read(ByteBuf in, int readOpts) throws DecodeException;
+    T read(ByteBuf in, int readOpts) throws CodecException;
 }
