@@ -1,20 +1,26 @@
-package com.zhw.skynet.core;
+package com.zhw.skynet.core.server;
 
 import com.zhw.skynet.common.Constants;
+import com.zhw.skynet.core.*;
 import com.zhw.skynet.core.protocol.*;
+import com.zhw.skynet.core.sh.ShakeHandsException;
+import com.zhw.skynet.core.sh.ShakeHandsHandler;
+import com.zhw.skynet.core.sh.ShakeHandsReq;
+import com.zhw.skynet.core.sh.ShakeHandsResp;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufInputStream;
 import io.netty.channel.*;
 import io.netty.channel.epoll.EpollDomainSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
+import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
 import java.io.File;
 import java.net.InetSocketAddress;
+import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,9 +35,9 @@ public class Server implements EndPoint {
     private class ReqMsgReceiveHandler extends ChannelInboundHandlerAdapter {
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            if (msg instanceof RequestMessage) {
+            if (msg instanceof ByteBuf) {
                 try {
-                    executor.execute(new DoInvokeTask((RequestMessage) msg));
+                    executor.execute(new DoInvokeTask((ByteBuf) msg));
                     return;
                 } catch (Throwable e) {
                     log.warn("error submit to executor", e);
@@ -42,14 +48,17 @@ public class Server implements EndPoint {
     }
 
     private class DoInvokeTask implements Runnable {
-        private RequestMessage reqMsg;
+        private ByteBuf in;
 
-        public DoInvokeTask(RequestMessage reqMsg) {
-            this.reqMsg = reqMsg;
+        public DoInvokeTask(ByteBuf in) {
+            this.in = in;
         }
 
         @Override
         public void run() {
+
+            RequestMessage reqMsg = codec.decodeRequest(in);
+
             ServiceInvoker invoker = invokerMap.get(reqMsg.getService());
             Response resp = new Response();
             resp.setReqId(reqMsg.getRequestId());
@@ -74,7 +83,7 @@ public class Server implements EndPoint {
             }
             ByteBuf buf = null;
             try {
-                buf = encoder.encode(resp, meta);
+                buf = codec.encode(resp, meta);
             } catch (Throwable e) {
                 log.error(e);
                 // 有可能是result编码失败
@@ -83,7 +92,7 @@ public class Server implements EndPoint {
                     resp.setErr(e);
                     resp.setBody(null);
                     try {
-                        buf = encoder.encode(resp, meta);
+                        buf = codec.encode(resp, meta);
                     } catch (Throwable err) {
                         log.error("error encode {}", resp, meta);
                     }
@@ -96,7 +105,7 @@ public class Server implements EndPoint {
     }
 
     public static int errorToCode(Throwable err) {
-        if (err instanceof DecodeException) {
+        if (err instanceof CodecException) {
             return Constants.CODE_SERVER_DECODE_ERROR;
         } else if (err instanceof ValidateException) {
             return Constants.CODE_SERVER_PARAM_VALID_ERROR;
@@ -106,7 +115,7 @@ public class Server implements EndPoint {
         }
     }
 
-    private Request convertToRequest(RequestMessage msg, ServiceMeta meta) throws DecodeException {
+    private Request convertToRequest(RequestMessage msg, ServiceMeta meta) throws CodecException {
         ByteBuf buf = msg.getBodyBuf();
         Object obj = null;
         if (msg.getServiceLen() > 0 && buf != null) {
@@ -119,7 +128,7 @@ public class Server implements EndPoint {
         return new Request(msg.getRequestId(), meta, obj);
     }
 
-    private Encoder<Response> encoder = new ResponseEncoder();
+    private Codec<Response, RequestMessage> codec;
     private Bootstrap bootstrap;
     private Channel channel;
     private Map<String, ServiceInvoker> invokerMap = new HashMap<>();
@@ -135,7 +144,16 @@ public class Server implements EndPoint {
         bootstrap.channel(NioSocketChannel.class);
         bootstrap.handler(new ChannelInitializer<NioSocketChannel>() {
             protected void initChannel(NioSocketChannel ch) throws Exception {
-                ch.pipeline().addLast(new ServerShakeHandsHandler())
+                ch.pipeline().addLast("msgSplitHandler", new LengthFieldBasedFrameDecoder(
+                        ByteOrder.LITTLE_ENDIAN,
+                        Constants.MAX_MSG_LEN,
+                        1,
+                        4,
+                        0,
+                        0,
+                        true
+                ))
+                        .addLast(ShakeHandsHandler.forProvider())
                         .addLast("ResponseReceiveHandler", new ReqMsgReceiveHandler());
             }
         });
@@ -152,7 +170,7 @@ public class Server implements EndPoint {
         bootstrap.channel(EpollDomainSocketChannel.class);
         bootstrap.handler(new ChannelInitializer<NioSocketChannel>() {
             protected void initChannel(NioSocketChannel ch) throws Exception {
-                ch.pipeline().addLast(new ServerShakeHandsHandler())
+                ch.pipeline().addLast(ShakeHandsHandler.forProvider())
                         .addLast("ResponseReceiveHandler", new ReqMsgReceiveHandler());
             }
         });
@@ -184,18 +202,17 @@ public class Server implements EndPoint {
         ShakeHandsReq handsReq = new ShakeHandsReq(metas);
         channel.writeAndFlush(handsReq).awaitUninterruptibly();
 
-        List<ShakeHandsReq.ServiceCount> list = handsReq.waitResponse(30000);
-        if (list == null) {
+        ShakeHandsResp resp = handsReq.waitResponse(30000);
+        if (resp == null) {
             channel.close().awaitUninterruptibly();
             throw new ShakeHandsException("timeout");
         }
 
         if (log.isDebugEnabled()) {
-            for (ShakeHandsReq.ServiceCount count : list) {
+            for (ShakeHandsResp.ServiceCount count : resp.getCounts()) {
                 log.debug("registered service {}", count);
             }
         }
-
         this.channel = channel;
     }
 

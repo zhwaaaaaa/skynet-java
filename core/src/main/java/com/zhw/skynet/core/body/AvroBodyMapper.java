@@ -2,7 +2,7 @@ package com.zhw.skynet.core.body;
 
 import com.zhw.skynet.core.BodyMapper;
 import com.zhw.skynet.core.DecodeException;
-import com.zhw.skynet.core.EncodeException;
+import com.zhw.skynet.core.protocol.CodecException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufOutputStream;
@@ -39,13 +39,13 @@ public class AvroBodyMapper<T> implements BodyMapper<T> {
     }
 
     @Override
-    public int writeTo(T data, ByteBuf out, int writeOpts) throws EncodeException {
+    public int writeTo(T data, ByteBuf out, int writeOpts) throws CodecException {
         try {
             ByteBufOutputStream os = new ByteBufOutputStream(out);
             writer.write(data, EncoderFactory.get().directBinaryEncoder(os, null));
             return os.writtenBytes();
         } catch (IOException e) {
-            throw new EncodeException(e);
+            throw new CodecException(e);
         }
     }
 

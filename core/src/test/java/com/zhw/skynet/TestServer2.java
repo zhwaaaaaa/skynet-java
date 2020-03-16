@@ -1,6 +1,6 @@
 package com.zhw.skynet;
 
-import com.zhw.skynet.core.Server;
+import com.zhw.skynet.core.server.Server;
 import com.zhw.skynet.service.UserServiceImp2;
 
 import java.util.concurrent.Executors;

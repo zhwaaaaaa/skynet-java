@@ -1,13 +1,10 @@
 package com.zhw.skynet.core.protocol;
 
 import com.zhw.skynet.common.Constants;
-import com.zhw.skynet.core.BodyMapper;
-import com.zhw.skynet.core.EncodeException;
 import com.zhw.skynet.core.Request;
 import com.zhw.skynet.core.ServiceMeta;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufOutputStream;
 
 public class RequestEncoder implements Encoder<Request> {
     private final ByteBufAllocator allocator;
@@ -21,23 +18,23 @@ public class RequestEncoder implements Encoder<Request> {
     }
 
     @Override
-    public ByteBuf encode(Request req, ServiceMeta meta) throws EncodeException {
+    public ByteBuf encode(Request req, ServiceMeta meta) throws CodecException {
         //|1|4reqId|4clientId|4serverId|1|service|1|method|4bodyLen|body|
         ByteBuf buffer = allocator.buffer();
         try {
             encode0(buffer, req, req.getMeta());
         } catch (Throwable e) {
             buffer.release();
-            if (e instanceof EncodeException) {
+            if (e instanceof CodecException) {
                 throw e;
             }
-            throw new EncodeException(e);
+            throw new CodecException(e);
         }
         return buffer;
     }
 
     @SuppressWarnings("unchecked")
-    private void encode0(ByteBuf buffer, Request req, ServiceMeta meta) throws EncodeException {
+    private void encode0(ByteBuf buffer, Request req, ServiceMeta meta) throws CodecException {
         //[1:serviceLen][1-238:serviceName][4:requestId][4:clientId][4:serverId][1:bodyType][4:bodyLen]
         int servLen = meta.getServiceName().length();
         buffer.writeByte(servLen);

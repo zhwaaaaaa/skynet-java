@@ -1,8 +1,13 @@
-package com.zhw.skynet.core;
+package com.zhw.skynet.core.client;
 
 import com.zhw.skynet.common.Constants;
 import com.zhw.skynet.common.RpcException;
+import com.zhw.skynet.core.*;
 import com.zhw.skynet.core.protocol.*;
+import com.zhw.skynet.core.sh.ShakeHandsException;
+import com.zhw.skynet.core.sh.ShakeHandsHandler;
+import com.zhw.skynet.core.sh.ShakeHandsReq;
+import com.zhw.skynet.core.sh.ShakeHandsResp;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
@@ -27,10 +32,10 @@ public class Client implements EndPoint {
     private static final EventLoopGroup GROUP = new NioEventLoopGroup(2);
     private static final InternalLogger log = InternalLoggerFactory.getInstance(Client.class);
 
-    private class ResponseReceiveHandler extends ChannelDuplexHandler {
+    private class ResponseReceiveHandler extends ChannelInboundHandlerAdapter {
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            if (msg instanceof ResponseMessage) {
+            if (msg instanceof ByteBuf) {
                 ResponseMessage response = (ResponseMessage) msg;
                 ReqAction reqAction = map.remove(response.getRequestId());
                 if (reqAction != null && reqAction.notifyResp(response)) {
@@ -53,7 +58,7 @@ public class Client implements EndPoint {
 
     private ConcurrentHashMap<Integer, ReqAction> map = new ConcurrentHashMap<>();
     private HashedWheelTimer timer = new HashedWheelTimer();
-    private Encoder<Request> encoder = new RequestEncoder();
+    private ClientCodec codec = new ClientCodec();
 
     private Bootstrap bootstrap;
     private Channel channel;
@@ -70,7 +75,7 @@ public class Client implements EndPoint {
         bootstrap.channel(NioSocketChannel.class);
         bootstrap.handler(new ChannelInitializer<NioSocketChannel>() {
             protected void initChannel(NioSocketChannel ch) throws Exception {
-                ch.pipeline().addLast(new ClientShakeHandsHandler())
+                ch.pipeline().addLast(ShakeHandsHandler.forConsumer())
                         .addLast("ResponseReceiveHandler", new ResponseReceiveHandler());
             }
         });
@@ -89,20 +94,20 @@ public class Client implements EndPoint {
         ShakeHandsReq handsReq = new ShakeHandsReq(serviceMetas);
         channel.writeAndFlush(handsReq).awaitUninterruptibly();
 
-        List<ShakeHandsReq.ServiceCount> list = handsReq.waitResponse(30000);
-        if (list == null) {
+        ShakeHandsResp resp = handsReq.waitResponse(30000);
+        if (resp == null) {
             channel.close().awaitUninterruptibly();
             throw new ShakeHandsException("timeout");
         }
 
         if (log.isDebugEnabled()) {
-            for (ShakeHandsReq.ServiceCount count : list) {
+            for (ShakeHandsResp.ServiceCount count : resp.getCounts()) {
                 log.debug("found {}", count);
             }
         }
 
-        List<String> notFound = list.stream().filter(x -> x.getProviderCount() == 0)
-                .map(ShakeHandsReq.ServiceCount::getName)
+        List<String> notFound = resp.getCounts().stream().filter(x -> x.getProviderCount() == 0)
+                .map(ShakeHandsResp.ServiceCount::getName)
                 .collect(Collectors.toList());
         if (notFound.size() > 0) {
             log.error("not found service {}", notFound);
@@ -117,7 +122,7 @@ public class Client implements EndPoint {
         ResponseMessage msg = null;
         Throwable err = null;
         try {
-            ByteBuf buf = encoder.encode(req, req.getMeta());
+            ByteBuf buf = codec.encode(req, req.getMeta());
             ReqAction action = new ReqAction(req);
             map.put(req.getReqId(), action);
             channel.writeAndFlush(buf);
@@ -162,7 +167,7 @@ public class Client implements EndPoint {
     }
 
     public void sendAsync(Request req, BiConsumer<Response, Throwable> consumer) {
-        ByteBuf buf = encoder.encode(req, req.getMeta());
+        ByteBuf buf = codec.encode(req, req.getMeta());
         long timeoutMs = req.getMeta().getTimeoutMs();
         Timeout timeout = timer.newTimeout(t -> {
             if (!t.isCancelled()) {

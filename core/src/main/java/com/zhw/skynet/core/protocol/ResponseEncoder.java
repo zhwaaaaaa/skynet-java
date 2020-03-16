@@ -1,12 +1,10 @@
 package com.zhw.skynet.core.protocol;
 
 import com.zhw.skynet.common.Constants;
-import com.zhw.skynet.core.EncodeException;
 import com.zhw.skynet.core.Response;
 import com.zhw.skynet.core.ServiceMeta;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufOutputStream;
 
 public class ResponseEncoder implements Encoder<Response> {
     private final ByteBufAllocator allocator;
@@ -20,22 +18,22 @@ public class ResponseEncoder implements Encoder<Response> {
     }
 
     @Override
-    public ByteBuf encode(Response response, ServiceMeta meta) throws EncodeException {
+    public ByteBuf encode(Response response, ServiceMeta meta) throws CodecException {
         ByteBuf buffer = allocator.buffer();
         try {
             encode0(buffer, response, meta);
         } catch (Throwable e) {
             buffer.release();
-            if (e instanceof EncodeException) {
+            if (e instanceof CodecException) {
                 throw e;
             }
-            throw new EncodeException(e);
+            throw new CodecException(e);
         }
         return buffer;
     }
 
     @SuppressWarnings("unchecked")
-    private void encode0(ByteBuf buffer, Response response, ServiceMeta meta) throws EncodeException {
+    private void encode0(ByteBuf buffer, Response response, ServiceMeta meta) throws CodecException {
         buffer.writeByte(Constants.RESPONSE_HEAD_LEN);
         /*
          response.setRequestId(in.readIntLE());

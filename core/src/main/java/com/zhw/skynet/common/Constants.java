@@ -21,6 +21,7 @@ public class Constants {
     public static final int CODE_SERVER_RUNTIME_ERROR = 50;
     // 异步
     public static final int CODE_SERVER_ASYNC_RUNTIME_ERROR = 51;
+    public static final int MAX_MSG_LEN = 1 << 30;//1G
 
     private Constants() {
     }

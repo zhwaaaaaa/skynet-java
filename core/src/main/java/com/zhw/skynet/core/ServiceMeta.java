@@ -4,6 +4,7 @@ import com.zhw.skynet.common.Constants;
 
 public class ServiceMeta {
     private String serviceName;
+    private String method;
     private int version;
     private long timeoutMs = 10000;
     private BodyMapper requestMapper;
@@ -47,6 +48,14 @@ public class ServiceMeta {
 
     public void setTimeoutMs(long timeoutMs) {
         this.timeoutMs = timeoutMs;
+    }
+
+    public String getMethod() {
+        return method;
+    }
+
+    public void setMethod(String method) {
+        this.method = method;
     }
 
     public BodyMapper getRequestMapper() {

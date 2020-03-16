@@ -3,6 +3,7 @@ package com.zhw.skynet.core.protocol;
 public class RequestMessage extends Message {
     private int serviceLen;
     private String service;
+    private String method;
 
     public String getService() {
         return service;
@@ -22,5 +23,13 @@ public class RequestMessage extends Message {
 
     public void setServiceLen(int serviceLen) {
         this.serviceLen = serviceLen;
+    }
+
+    public String getMethod() {
+        return method;
+    }
+
+    public void setMethod(String method) {
+        this.method = method;
     }
 }

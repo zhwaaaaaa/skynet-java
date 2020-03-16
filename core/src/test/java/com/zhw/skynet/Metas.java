@@ -17,12 +17,14 @@ public class Metas {
         Method[] methods = clz.getDeclaredMethods();
         List<ServiceMeta> metas = new ArrayList<>(methods.length);
         for (Method method : methods) {
-            String serviceName = name + Constants.SERVICE_NAME_SEPARATOR + method.getName();
-            if (!names.add(serviceName)) {
-                throw new IllegalStateException("serviceName exists " + serviceName);
+            String methodName = method.getName();
+            String serviceMethod = name + Constants.SERVICE_NAME_SEPARATOR + methodName;
+            if (!names.add(serviceMethod)) {
+                throw new IllegalStateException("serviceName exists " + serviceMethod);
             }
             ServiceMeta meta = new ServiceMeta();
-            meta.setServiceName(serviceName);
+            meta.setServiceName(name);
+            meta.setMethod(methodName);
             meta.setRequestMapper(new AvroBodyMapper(method.getGenericParameterTypes()[0]));
             meta.setResponseMapper(new AvroBodyMapper(method.getGenericReturnType()));
             metas.add(meta);

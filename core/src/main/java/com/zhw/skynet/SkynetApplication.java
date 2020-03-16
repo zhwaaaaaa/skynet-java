@@ -1,6 +1,6 @@
 package com.zhw.skynet;
 
-import com.zhw.skynet.core.Client;
+import com.zhw.skynet.core.client.Client;
 import com.zhw.skynet.core.Request;
 import com.zhw.skynet.core.ServiceMeta;
 

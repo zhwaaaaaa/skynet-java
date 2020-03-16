@@ -1,13 +1,8 @@
-package com.zhw.skynet.core.protocol;
+package com.zhw.skynet.core.sh;
 
-import com.zhw.skynet.core.Action;
-import com.zhw.skynet.core.ServiceMeta;
-
-import java.util.Collection;
 import java.util.List;
-import java.util.Set;
 
-public class ShakeHandsReq extends Action<List<ShakeHandsReq.ServiceCount>> {
+public class ShakeHandsResp {
     public static class ServiceCount {
         private String name;
         private int providerCount;
@@ -31,13 +26,21 @@ public class ShakeHandsReq extends Action<List<ShakeHandsReq.ServiceCount>> {
         }
     }
 
-    private Collection<ServiceMeta> services;
+    private List<ServiceCount> counts;
 
-    public ShakeHandsReq(Collection<ServiceMeta> services) {
-        this.services = services;
+    public ShakeHandsResp(List<ServiceCount> counts) {
+        this.counts = counts;
     }
 
-    public Collection<ServiceMeta> getServices() {
-        return services;
+    public List<ServiceCount> getCounts() {
+        return counts;
+    }
+
+    public void setCounts(List<ServiceCount> counts) {
+        this.counts = counts;
+    }
+
+    public void addServiceCount(String service, int count) {
+        counts.add(new ServiceCount(service, count));
     }
 }

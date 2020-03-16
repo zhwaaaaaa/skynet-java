@@ -1,22 +1,15 @@
 package com.zhw.skynet;
 
-import com.zhw.skynet.core.Client;
+import com.zhw.skynet.core.client.Client;
 import com.zhw.skynet.core.Request;
-import com.zhw.skynet.core.Response;
 import com.zhw.skynet.core.ServiceMeta;
 import com.zhw.skynet.service.User;
 import com.zhw.skynet.service.UserService;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufInputStream;
 
-import java.nio.file.*;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 public class TestClient {
     public static void main(String[] args) throws Throwable {
@@ -38,7 +31,7 @@ public class TestClient {
         }
         System.out.println(response);
         System.out.println("1次同步调用服务，耗时" + (System.currentTimeMillis() - start));*/
-        times = 30000;
+        times = 3000;
         CountDownLatch latch = new CountDownLatch(times);
         start = System.currentTimeMillis();
         for (int i = 0; i < times; i++) {
