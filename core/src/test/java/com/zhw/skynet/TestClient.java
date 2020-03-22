@@ -18,8 +18,9 @@ public class TestClient {
         client.start(of);
         System.out.println("服务调用方启动成功");
         ServiceMeta meta = of.get(0);
+        meta.setTimeoutMs(100000);
         long start;
-        int times = 10000;
+        int times = 1000000;
         /*List<User> users = new ArrayList<>();
         for (int i = 0; i < times; i++) {
             users.add(new User("王宝强" + i, i, i % 2 == 0));
@@ -31,7 +32,7 @@ public class TestClient {
         }
         System.out.println(response);
         System.out.println("1次同步调用服务，耗时" + (System.currentTimeMillis() - start));*/
-        times = 3;
+//        times = 3;
         CountDownLatch latch = new CountDownLatch(times);
         start = System.currentTimeMillis();
         for (int i = 0; i < times; i++) {
@@ -42,7 +43,7 @@ public class TestClient {
                         latch.countDown();
                         if (e != null) {
                             System.out.println("error in invoke " + req.getReqId() + " " + e.getMessage());
-                        } else {
+                        } else if (r.getCode() != 0) {
                             System.out.println(r);
                         }
                     }

@@ -3,11 +3,11 @@ package com.zhw.skynet.core;
 import com.zhw.skynet.core.protocol.CodecException;
 import io.netty.buffer.ByteBuf;
 
-public interface BodyMapper<T> {
+public interface BodyMapper {
 
     String typeDesc();
 
-    int writeTo(T data, ByteBuf out, int writeOpts) throws CodecException;
+    void writeTo(Object data, ByteBuf out, int writeOpts) throws CodecException;
 
-    T read(ByteBuf in, int readOpts) throws CodecException;
+    Object read(ByteBuf in, int readOpts) throws CodecException;
 }

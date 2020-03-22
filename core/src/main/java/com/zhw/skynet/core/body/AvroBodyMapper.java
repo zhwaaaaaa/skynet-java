@@ -16,12 +16,12 @@ import org.apache.avro.reflect.ReflectDatumWriter;
 import java.io.IOException;
 import java.lang.reflect.Type;
 
-public class AvroBodyMapper<T> implements BodyMapper<T> {
-    private ReflectDatumWriter<T> writer;
-    private ReflectDatumReader<T> reader;
+public class AvroBodyMapper implements BodyMapper {
+    private ReflectDatumWriter<Object> writer;
+    private ReflectDatumReader<Object> reader;
     private Schema schema;
 
-    public AvroBodyMapper(Class<T> type) {
+    public AvroBodyMapper(Class<?> type) {
         this((Type) type);
     }
 
@@ -38,18 +38,17 @@ public class AvroBodyMapper<T> implements BodyMapper<T> {
     }
 
     @Override
-    public int writeTo(T data, ByteBuf out, int writeOpts) throws CodecException {
+    public void writeTo(Object data, ByteBuf out, int writeOpts) throws CodecException {
         try {
             ByteBufOutputStream os = new ByteBufOutputStream(out);
             writer.write(data, EncoderFactory.get().directBinaryEncoder(os, null));
-            return os.writtenBytes();
         } catch (IOException e) {
             throw new CodecException(e);
         }
     }
 
     @Override
-    public T read(ByteBuf in, int readOpts) throws CodecException {
+    public Object read(ByteBuf in, int readOpts) throws CodecException {
         try {
             BinaryDecoder decoder = DecoderFactory.get()
                     .directBinaryDecoder(new ByteBufInputStream(in), null);

@@ -3,6 +3,7 @@ package com.zhw.skynet.core.client;
 import com.zhw.skynet.common.Constants;
 import com.zhw.skynet.common.RpcException;
 import com.zhw.skynet.core.*;
+import com.zhw.skynet.core.protocol.HeartbeatFilterHandler;
 import com.zhw.skynet.core.protocol.ResponseMessage;
 import com.zhw.skynet.core.sh.ShakeHandsException;
 import com.zhw.skynet.core.sh.ShakeHandsHandler;
@@ -15,6 +16,7 @@ import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
+import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.HashedWheelTimer;
 import io.netty.util.Timeout;
 import io.netty.util.internal.logging.InternalLogger;
@@ -35,18 +37,21 @@ public class Client implements EndPoint {
     private static final EventLoopGroup GROUP = new NioEventLoopGroup(2);
     private static final InternalLogger log = InternalLoggerFactory.getInstance(Client.class);
 
-    private class ResponseReceiveHandler extends ChannelInboundHandlerAdapter {
+    private class ResponseReceiveHandler extends HeartbeatFilterHandler {
+
         @Override
-        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            if (msg instanceof ByteBuf) {
-                ByteBuf in = (ByteBuf) msg;
+        protected boolean onMessage(MsgType type, ByteBuf in) throws Exception {
+            if (type == MsgType.MT_RESPONSE) {
+                // 只要是一个request消息就返回true
                 ResponseMessage response = codec.decodeRequest(in);
                 ReqAction reqAction = map.remove(response.getRequestId());
-                if (reqAction != null && reqAction.notifyResp(response)) {
-                    return;
+                if (reqAction == null || !reqAction.notifyResp(response)) {
+                    // 没有找到对应的请求，可能是超时了。应该自己释放buf
+                    in.release();
                 }
+                return true;
             }
-            super.channelRead(ctx, msg);
+            return false;
         }
     }
 
@@ -70,6 +75,7 @@ public class Client implements EndPoint {
         bootstrap.handler(new ChannelInitializer<NioSocketChannel>() {
             protected void initChannel(NioSocketChannel ch) throws Exception {
                 ch.pipeline()
+                        .addLast("idle", new IdleStateHandler(0, 0, 50))
                         .addLast("msgSplitHandler", new LengthFieldBasedFrameDecoder(
                                 ByteOrder.LITTLE_ENDIAN,
                                 Constants.MAX_MSG_LEN,

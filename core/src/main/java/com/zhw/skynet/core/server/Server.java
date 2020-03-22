@@ -5,6 +5,7 @@ import com.zhw.skynet.common.RpcException;
 import com.zhw.skynet.core.*;
 import com.zhw.skynet.core.protocol.Codec;
 import com.zhw.skynet.core.protocol.CodecException;
+import com.zhw.skynet.core.protocol.HeartbeatFilterHandler;
 import com.zhw.skynet.core.protocol.RequestMessage;
 import com.zhw.skynet.core.sh.ShakeHandsException;
 import com.zhw.skynet.core.sh.ShakeHandsHandler;
@@ -19,6 +20,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
+import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
@@ -36,18 +38,23 @@ public class Server implements EndPoint {
 
     private final EventLoopGroup GROUP = new NioEventLoopGroup(1);
 
-    private class ReqMsgReceiveHandler extends ChannelInboundHandlerAdapter {
+    private class ReqMsgReceiveHandler extends HeartbeatFilterHandler {
+
         @Override
-        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            if (msg instanceof ByteBuf) {
+        protected boolean onMessage(MsgType type, ByteBuf in) throws Exception {
+            if (type == MsgType.MT_REQUEST) {
                 try {
-                    executor.execute(new DoInvokeTask((ByteBuf) msg));
-                    return;
+                    executor.execute(new DoInvokeTask(in));
+                    return true;
                 } catch (Throwable e) {
                     log.warn("error submit to executor", e);
                 }
+            } else {
+                if (log.isDebugEnabled()) {
+                    log.debug("close channel because of invalid message:", type);
+                }
             }
-            super.channelRead(ctx, msg);
+            return false;
         }
     }
 
@@ -141,15 +148,17 @@ public class Server implements EndPoint {
         bootstrap.channel(NioSocketChannel.class);
         bootstrap.handler(new ChannelInitializer<NioSocketChannel>() {
             protected void initChannel(NioSocketChannel ch) throws Exception {
-                ch.pipeline().addLast("msgSplitHandler", new LengthFieldBasedFrameDecoder(
-                        ByteOrder.LITTLE_ENDIAN,
-                        Constants.MAX_MSG_LEN,
-                        1,
-                        4,
-                        0,
-                        0,
-                        true
-                ))
+                ch.pipeline()
+                        .addLast("idle", new IdleStateHandler(0, 0, 50))
+                        .addLast("msgSplitHandler", new LengthFieldBasedFrameDecoder(
+                                ByteOrder.LITTLE_ENDIAN,
+                                Constants.MAX_MSG_LEN,
+                                1,
+                                4,
+                                0,
+                                0,
+                                true
+                        ))
                         .addLast(ShakeHandsHandler.forProvider())
                         .addLast("ResponseReceiveHandler", new ReqMsgReceiveHandler());
             }
