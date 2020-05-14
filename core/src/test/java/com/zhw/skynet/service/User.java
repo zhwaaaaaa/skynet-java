@@ -1,7 +1,10 @@
 package com.zhw.skynet.service;
 
+import org.apache.avro.reflect.Nullable;
+
 public class User {
 
+    @Nullable
     private String name;
     private int age;
     private boolean sex;
