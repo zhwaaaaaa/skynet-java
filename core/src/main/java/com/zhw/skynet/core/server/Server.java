@@ -85,6 +85,7 @@ public class Server implements EndPoint {
                 try {
                     meta = invoker.getServiceMeta();
                     Request request = convertToRequest(reqMsg, meta);
+                    reqMsg.releaseBodyBuf();
                     Object result = invoker.invoke(request.getBody());
                     resp.setBody(result);
                 } catch (Throwable e) {

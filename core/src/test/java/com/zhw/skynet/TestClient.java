@@ -22,7 +22,7 @@ public class TestClient {
         ServiceMeta meta = of.get(0);
         meta.setTimeoutMs(100000);
         sendSync(client, meta, 100, 1);
-        sendSync(client, meta, 100, 10000);
+        /*sendSync(client, meta, 100, 10000);
         sendSync(client, meta, 10000, 1);
         sendSync(client, meta, 10000, 10);
 //        times = 3;
@@ -30,7 +30,7 @@ public class TestClient {
         asyncSend(client, meta, 100, 100000);
         asyncSend(client, meta, 10000, 1);
         asyncSend(client, meta, 100000, 100);
-        asyncSend(client, meta, 1000000, 1);
+        asyncSend(client, meta, 1000000, 1);*/
 
     }
 
